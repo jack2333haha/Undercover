@@ -5,7 +5,7 @@ var path = require('path');
 var server = require('http').createServer(app);
 var io = require('../..')(server);
 var port = process.env.PORT || 3000;
-
+var data=require('./db/date.js');
 server.listen(port, () => {
     console.log('Server listening at port %d', port);
 });
@@ -60,12 +60,13 @@ io.on('connection', (socket) => {
     });
 
     // when the client emits 'add user', this listens and executes
-    socket.on('add user', (username) => {
+    socket.on('add user', (userInfo) => {
         if (addedUser) return;
 
         socket.join(roomId);      //加入房间
         // we store the username in the socket session for this client
-        socket.username = username;
+        socket.username = userInfo.nickName;
+
         // ++numUsers;
         addedUser = true;
 
@@ -77,6 +78,8 @@ io.on('connection', (socket) => {
         // broadcast to everyone in the room 除了自己
         socket.to(roomId).emit('user joined', {
             username: socket.username,
+            userInfo:userInfo,
+            id:socket.id
         });
 
     });
@@ -96,13 +99,14 @@ io.on('connection', (socket) => {
     });
 
     // when the user disconnects.. perform this
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (userInfo) => {
         if (addedUser) {
-
+            console.log("disconnect userInfo:"+userInfo);//估计这里根本没有值
             socket.leave(roomId);  //离开房间
             // echo globally that this client has left
             socket.to(roomId).emit('user left', {
                 username: socket.username,
+                userInfo:userInfo,
 
             });
         }
@@ -112,18 +116,38 @@ io.on('connection', (socket) => {
     /**
      * room event
      */
-    //监听房间内的准备消息
-    socket.on('ready',()=>{
+    //监听换房主的消息
+    socket.on('new owner',(userInfo)=>{
+        //告诉房间内其他成员，新房主信息
+       socket.to(roomId).emit('owner',userInfo)
+    });
 
-        //告诉房间内其它成员，该用户已经准备好
-        socket.to(roomId).emit('user ready',{
-            username:socket.username,
+    //监听房间内数据更新
+    socket.on('update user',(data)=>{
+
+
+        socket.to(data.id).emit('new users',{
+            people:data.people,
+            users:data.users
+        })
+    });
+
+
+
+    //监听房间内的准备消息
+    socket.on('sit down',(userInfo)=>{
+
+        //告诉房间内其它成员，该用户已经准备好,并将该玩家的位置信息通知
+        io.to(roomId).emit('user ready',{
+            userInfo:userInfo,
+            username:userInfo.nickName,
         })
     });
     //监听房价内的开始游戏事件
     socket.on('start game',()=>{
-        var word=getwords();
-        var num=Math.ceil(Math.random()*6);
+        var word=data.getwords();
+        console.log("word:"+word);
+        var num="v"+Math.ceil(Math.random()*6);  //随机生成房间内座位号的id
         //游戏一旦开始，分发抽中词汇给所有成员，并指定卧底是几号
         io.to(roomId).emit('hand out word',{
             word:word,
