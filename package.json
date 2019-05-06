@@ -9,7 +9,8 @@
   "dependencies": {
     "express": "^4.16.4",
     "mongodb": "^3.2.3",
-    "node-uuid": "^1.4.8"
+    "node-uuid": "^1.4.8",
+    "socket.io": "^2.2.0"
   },
   "scripts": {
     "start": "node index.js"
